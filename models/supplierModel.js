@@ -34,23 +34,31 @@ const supplierSchema = new mongoose.Schema({
   taxId: String,
 
   // Business Information
-  businessType: {
-    type: String,
-    enum: ["Manufacturer", "Wholesaler", "Distributor", "Other"],
-  },
+  businessType: [
+    {
+      type: String,
+      enum: ["Manufacturer", "Wholesaler", "Distributor", "Importer", "Other"],
+    },
+  ],
   yearsInBusiness: Number,
-  certifications: [String],
 
   // Product Information
   products: [
     {
+      brandName: String,
       name: String,
-      category: String,
+      category: {
+        type: String,
+        enum: ["Cement", "Other"],
+      },
       description: String,
       minOrderQuantity: Number,
       price: Number,
       unit: String,
-      availableQuantity: Number,
+      availableQuantity: {
+        type: String,
+        enum: ["1kg", "2kg", "5kg", "10kg", "20kg", "25kg", "40kg", "50kg"],
+      },
       leadTime: String, // e.g., "2-4 weeks"
     },
   ],
@@ -58,23 +66,62 @@ const supplierSchema = new mongoose.Schema({
   // Warehouse Information
   warehouses: [
     {
+      warehouseName: String,
       location: String,
-      size: Number, // in sq ft
-      capacity: Number, // in units
       handlingCapacity: Number, // units per day
     },
   ],
 
   // Logistics
-  shippingMethods: [String],
-  deliveryAreas: [String],
+  shippingMethods: [
+    {
+      type: String,
+      enum: [
+        "Air Freight",
+        "Sea Freight",
+        "Land Transport",
+        "Express Delivery",
+        "Standard Delivery",
+      ],
+    },
+  ],
+  deliveryAreas: [
+    {
+      type: String,
+      enum: ["Seminyak", "Bali"],
+    },
+  ],
 
   // Payment Terms
-  paymentTerms: {
+  paymentTerms: [
+    {
+      type: String,
+      enum: [
+        "Net 30",
+        "Net 60",
+        "Advance Payment",
+        "Cash on Delivery",
+        "Other",
+      ],
+    },
+  ],
+  preferredCurrency: {
     type: String,
-    enum: ["Net 30", "Net 60", "Advance Payment", "Other"],
+    default: "IDR",
   },
-  preferredCurrency: String,
+
+  // Document Verification
+  documents: [
+    {
+      documentId: String,
+      documentImage: String, // base64 string
+      description: String,
+      uploadedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
 
   // Status
   status: {

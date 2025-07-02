@@ -69,30 +69,93 @@ router.patch("/:id/business", async (req, res) => {
       "Manufacturer",
       "Wholesaler",
       "Distributor",
+      "Importer",
       "Other",
     ];
-    const validPaymentTerms = ["Net 30", "Net 60", "Advance Payment", "Other"];
+    const validPaymentTerms = [
+      "Net 30",
+      "Net 60",
+      "Advance Payment",
+      "Cash on Delivery",
+      "Other",
+    ];
+    const validShippingMethods = [
+      "Air Freight",
+      "Sea Freight",
+      "Land Transport",
+      "Express Delivery",
+      "Standard Delivery",
+    ];
+    const validDeliveryAreas = ["Seminyak", "Bali"];
 
-    if (
-      businessData.businessType &&
-      !validBusinessTypes.includes(businessData.businessType)
-    ) {
-      return res.status(400).json({ message: "Invalid business type" });
+    // Validate business types (array)
+    if (businessData.businessType && Array.isArray(businessData.businessType)) {
+      const invalidTypes = businessData.businessType.filter(
+        (type) => !validBusinessTypes.includes(type)
+      );
+      if (invalidTypes.length > 0) {
+        return res
+          .status(400)
+          .json({
+            message: `Invalid business types: ${invalidTypes.join(", ")}`,
+          });
+      }
     }
 
+    // Validate payment terms (array)
+    if (businessData.paymentTerms && Array.isArray(businessData.paymentTerms)) {
+      const invalidTerms = businessData.paymentTerms.filter(
+        (term) => !validPaymentTerms.includes(term)
+      );
+      if (invalidTerms.length > 0) {
+        return res
+          .status(400)
+          .json({
+            message: `Invalid payment terms: ${invalidTerms.join(", ")}`,
+          });
+      }
+    }
+
+    // Validate shipping methods (array)
     if (
-      businessData.paymentTerms &&
-      !validPaymentTerms.includes(businessData.paymentTerms)
+      businessData.shippingMethods &&
+      Array.isArray(businessData.shippingMethods)
     ) {
-      return res.status(400).json({ message: "Invalid payment terms" });
+      const invalidMethods = businessData.shippingMethods.filter(
+        (method) => !validShippingMethods.includes(method)
+      );
+      if (invalidMethods.length > 0) {
+        return res
+          .status(400)
+          .json({
+            message: `Invalid shipping methods: ${invalidMethods.join(", ")}`,
+          });
+      }
+    }
+
+    // Validate delivery areas (array)
+    if (
+      businessData.deliveryAreas &&
+      Array.isArray(businessData.deliveryAreas)
+    ) {
+      const invalidAreas = businessData.deliveryAreas.filter(
+        (area) => !validDeliveryAreas.includes(area)
+      );
+      if (invalidAreas.length > 0) {
+        return res
+          .status(400)
+          .json({
+            message: `Invalid delivery areas: ${invalidAreas.join(", ")}`,
+          });
+      }
     }
 
     // Parse arrays safely
     const updateData = {
       ...businessData,
-      certifications: Array.isArray(businessData.certifications)
-        ? businessData.certifications
-        : JSON.parse(businessData.certifications || "[]"),
+      businessType: Array.isArray(businessData.businessType)
+        ? businessData.businessType
+        : JSON.parse(businessData.businessType || "[]"),
       products: Array.isArray(businessData.products)
         ? businessData.products
         : JSON.parse(businessData.products || "[]"),
@@ -105,6 +168,13 @@ router.patch("/:id/business", async (req, res) => {
       deliveryAreas: Array.isArray(businessData.deliveryAreas)
         ? businessData.deliveryAreas
         : JSON.parse(businessData.deliveryAreas || "[]"),
+      paymentTerms: Array.isArray(businessData.paymentTerms)
+        ? businessData.paymentTerms
+        : JSON.parse(businessData.paymentTerms || "[]"),
+      documents: Array.isArray(businessData.documents)
+        ? businessData.documents
+        : JSON.parse(businessData.documents || "[]"),
+      preferredCurrency: "IDR", // Fixed as IDR
     };
 
     const updatedSupplier = await Supplier.findByIdAndUpdate(id, updateData, {
@@ -122,6 +192,64 @@ router.patch("/:id/business", async (req, res) => {
       message: error.message,
       details: process.env.NODE_ENV !== "production" ? error.stack : undefined,
     });
+  }
+});
+
+// Document upload route
+router.post(
+  "/:id/documents",
+  upload.single("documentImage"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { documentId, description } = req.body;
+
+      if (!req.file) {
+        return res.status(400).json({ message: "Document image is required" });
+      }
+
+      const documentData = {
+        documentId,
+        documentImage: bufferToBase64(req.file.buffer, req.file.mimetype),
+        description,
+        uploadedAt: new Date(),
+      };
+
+      const supplier = await Supplier.findById(id);
+      if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found" });
+      }
+
+      supplier.documents.push(documentData);
+      await supplier.save();
+
+      res.json(supplier);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  }
+);
+
+// Delete document route
+router.delete("/:id/documents/:documentIndex", async (req, res) => {
+  try {
+    const { id, documentIndex } = req.params;
+
+    const supplier = await Supplier.findById(id);
+    if (!supplier) {
+      return res.status(404).json({ message: "Supplier not found" });
+    }
+
+    if (documentIndex >= supplier.documents.length) {
+      return res.status(404).json({ message: "Document not found" });
+    }
+
+    supplier.documents.splice(documentIndex, 1);
+    await supplier.save();
+
+    res.json(supplier);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 });
 
@@ -170,6 +298,9 @@ router.patch("/:id", upload.single("profilePicture"), async (req, res) => {
     }
     if (typeof supplierData.address === "string") {
       supplierData.address = JSON.parse(supplierData.address);
+    }
+    if (typeof supplierData.documents === "string") {
+      supplierData.documents = JSON.parse(supplierData.documents);
     }
 
     const supplier = await Supplier.findByIdAndUpdate(
