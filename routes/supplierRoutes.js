@@ -25,51 +25,43 @@ const bufferToBase64 = (buffer, mimetype) => {
   return `data:${mimetype};base64,${buffer.toString("base64")}`;
 };
 
-// Create/Update supplier profile - Admin only
-router.post(
-  "/",
-  authenticateJWT,
-  checkRole("admin"),
-  upload.single("profilePicture"),
-  async (req, res) => {
-    try {
-      const supplierData = {
-        ...req.body,
-        address: req.body.address ? JSON.parse(req.body.address) : undefined,
-        status: "Pending",
-      };
+router.post("/", upload.single("profilePicture"), async (req, res) => {
+  try {
+    const supplierData = {
+      ...req.body,
+      address: req.body.address ? JSON.parse(req.body.address) : undefined,
+      status: "Pending",
+    };
 
-      if (req.file) {
-        supplierData.profilePicture = bufferToBase64(
-          req.file.buffer,
-          req.file.mimetype
-        );
-      }
-
-      let supplier = await Supplier.findOne({ email: supplierData.email });
-      if (supplier) {
-        supplier = await Supplier.findOneAndUpdate(
-          { email: supplierData.email },
-          supplierData,
-          { new: true }
-        );
-      } else {
-        supplier = new Supplier(supplierData);
-        await supplier.save();
-      }
-
-      res.status(201).json(supplier);
-    } catch (error) {
-      res.status(400).json({ message: error.message });
+    if (req.file) {
+      supplierData.profilePicture = bufferToBase64(
+        req.file.buffer,
+        req.file.mimetype
+      );
     }
+
+    let supplier = await Supplier.findOne({ email: supplierData.email });
+    if (supplier) {
+      supplier = await Supplier.findOneAndUpdate(
+        { email: supplierData.email },
+        supplierData,
+        { new: true }
+      );
+    } else {
+      supplier = new Supplier(supplierData);
+      await supplier.save();
+    }
+
+    res.status(201).json(supplier);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
-);
+});
 
 // Business Details Routes - Admin only
 router.patch(
   "/:id/business",
-  authenticateJWT,
-  checkRole("admin"),
+
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -208,8 +200,7 @@ router.patch(
 // Document upload route - Admin only
 router.post(
   "/:id/documents",
-  authenticateJWT,
-  checkRole("admin"),
+
   upload.single("documentImage"),
   async (req, res) => {
     try {
@@ -245,8 +236,7 @@ router.post(
 // Delete document route - Admin only
 router.delete(
   "/:id/documents/:documentIndex",
-  authenticateJWT,
-  checkRole("admin"),
+
   async (req, res) => {
     try {
       const { id, documentIndex } = req.params;
@@ -340,11 +330,11 @@ router.patch(
   }
 );
 
-// Update supplier status - Admin only
+// Update supplier status - Both admin and user can access
 router.patch(
   "/:id/status",
   authenticateJWT,
-  checkRole("admin"),
+  checkRole(["admin", "user"]), // Changed to allow both roles
   async (req, res) => {
     try {
       const { status } = req.body;

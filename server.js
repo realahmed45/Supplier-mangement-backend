@@ -8,12 +8,12 @@ const path = require("path");
 
 const app = express();
 
-// Middleware - Configure CORS to allow all origins
+// Middleware
 app.use(
   cors({
-    origin: "*", // Allow all origins
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], // Allowed methods
-    allowedHeaders: ["Content-Type", "Authorization"], // Allowed headers
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(express.json());
@@ -31,28 +31,21 @@ mongoose
   .then(async () => {
     console.log("Connected to MongoDB");
 
-    // Create initial admin user if doesn't exist
+    // Create initial users if they don't exist
     const User = require("./models/userModel");
-    const adminUser = await User.findOne({ username: "admin" });
-    if (!adminUser) {
-      const user = new User({
-        username: "admin",
-        password: "admin123", // Will be hashed by pre-save hook
-        role: "admin",
-      });
-      await user.save();
-      console.log("Default admin user created");
-    }
+    const roles = ["admin", "viewer", "user"];
 
-    const viewerUser = await User.findOne({ username: "viewer" });
-    if (!viewerUser) {
-      const user = new User({
-        username: "viewer",
-        password: "viewer123", // Will be hashed by pre-save hook
-        role: "viewer",
-      });
-      await user.save();
-      console.log("Default viewer user created");
+    for (const role of roles) {
+      const user = await User.findOne({ username: role });
+      if (!user) {
+        const newUser = new User({
+          username: role,
+          password: `${role}123`, // Will be hashed by pre-save hook
+          role: role,
+        });
+        await newUser.save();
+        console.log(`Default ${role} user created`);
+      }
     }
   })
   .catch((err) => console.error("MongoDB connection error:", err));
@@ -60,8 +53,6 @@ mongoose
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/suppliers", supplierRoutes);
-// Add these near your other routes
-
 app.use("/api/users", userRoutes);
 
 // Error handling middleware

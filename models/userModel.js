@@ -13,7 +13,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ["viewer", "admin"],
+    enum: ["viewer", "admin", "user"], // Added "user" role
     default: "viewer",
   },
   createdAt: {
@@ -34,7 +34,6 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-// Method to compare passwords
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };

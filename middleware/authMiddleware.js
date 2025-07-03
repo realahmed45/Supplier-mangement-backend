@@ -29,8 +29,9 @@ exports.authenticateJWT = (req, res, next) => {
   });
 };
 
-exports.checkRole = (role) => (req, res, next) => {
-  if (req.user.role !== role) {
+// Modified to handle multiple roles
+exports.checkRole = (roles) => (req, res, next) => {
+  if (!roles.includes(req.user.role)) {
     return res.status(403).json({ message: "Insufficient permissions" });
   }
   next();
