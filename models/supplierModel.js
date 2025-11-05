@@ -42,24 +42,45 @@ const supplierSchema = new mongoose.Schema({
   ],
   yearsInBusiness: Number,
 
-  // Product Information
+  // Product Information - Updated with category system
   products: [
     {
-      brandName: String,
-      name: String,
       category: {
         type: String,
-        enum: ["Cement", "Other"],
+        required: true,
+      },
+      subcategory: {
+        type: String,
+        required: true,
+      },
+      name: {
+        type: String,
+        required: true,
+      },
+      brandName: {
+        type: String,
+        required: true,
+      },
+      selectedSize: {
+        type: String,
+        required: true,
       },
       description: String,
-      minOrderQuantity: Number,
-      price: Number,
-      unit: String,
-      availableQuantity: {
-        type: String,
-        enum: ["1kg", "2kg", "5kg", "10kg", "20kg", "25kg", "40kg", "50kg"],
+      minOrderQuantity: {
+        type: Number,
+        required: true,
       },
-      leadTime: String, // e.g., "2-4 weeks"
+      price: {
+        type: Number,
+        required: true,
+      },
+      unit: {
+        type: String,
+        enum: ["piece", "kg", "liter", "box", "pack"],
+        required: true,
+      },
+      availableQuantity: String,
+      leadTime: String,
     },
   ],
 
