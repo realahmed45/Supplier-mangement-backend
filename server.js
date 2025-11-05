@@ -16,13 +16,15 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-app.use(express.json());
+// With this:
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // MongoDB Connection
 mongoose
   .connect(
-    "mongodb+srv://realahmedali4:xRiW3NB6an59MdD9@cluster0.zmlydbn.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
+    "mongodb+srv://chatbiz50_db_user:dtorU38nkLmTNdy8@cluster0.ehikyfh.mongodb.net/?appName=Cluster0",
     {
       useNewUrlParser: true,
       useUnifiedTopology: true,

@@ -6,20 +6,26 @@ const { authenticateJWT, checkRole } = require("../middleware/authMiddleware");
 
 // Configure multer for memory storage (base64)
 const storage = multer.memoryStorage();
+
 const upload = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB limit
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
+    if (
+      file.mimetype.startsWith("image/") ||
+      file.mimetype === "application/pdf" ||
+      file.mimetype === "application/msword" ||
+      file.mimetype ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ) {
       cb(null, true);
     } else {
-      cb(new Error("Only image files are allowed"), false);
+      cb(new Error("Only image and document files are allowed"), false);
     }
   },
 });
-
 // Helper function to convert buffer to base64
 const bufferToBase64 = (buffer, mimetype) => {
   return `data:${mimetype};base64,${buffer.toString("base64")}`;
@@ -286,8 +292,7 @@ router.get("/:id", authenticateJWT, async (req, res) => {
 // Update supplier - Admin only
 router.patch(
   "/:id",
-  authenticateJWT,
-  checkRole("admin"),
+
   upload.single("profilePicture"),
   async (req, res) => {
     try {
