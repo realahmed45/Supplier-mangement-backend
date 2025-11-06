@@ -42,14 +42,20 @@ exports.authenticateUser = async (req, res, next) => {
       });
     }
 
-    // Check if token was issued before user's last token update
+    // Check if token was issued before user's last token update (only if explicitly revoked)
     if (decoded.iat && user.lastTokenIssued) {
       const tokenIssuedAt = new Date(decoded.iat * 1000);
       console.log("Token issued at:", tokenIssuedAt);
       console.log("User last token issued:", user.lastTokenIssued);
 
-      if (tokenIssuedAt < user.lastTokenIssued) {
-        console.log("Token revoked - issued before last token update");
+      // Only revoke if the difference is more than 1 minute (to avoid timing issues)
+      const timeDifferenceMs =
+        user.lastTokenIssued.getTime() - tokenIssuedAt.getTime();
+      if (timeDifferenceMs > 60000) {
+        // 1 minute buffer
+        console.log(
+          "Token revoked - issued before last token update with significant time difference"
+        );
         return res.status(401).json({
           success: false,
           message: "Token revoked",
