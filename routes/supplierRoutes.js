@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const Supplier = require("../models/supplierModel");
+const User = require("../models/User");
 const multer = require("multer");
-const { authenticateJWT, checkRole } = require("../middleware/authMiddleware");
+const { authenticateUser } = require("../middleware/authMiddleware");
 
 // Configure multer for memory storage (base64)
 const storage = multer.memoryStorage();
@@ -26,195 +27,252 @@ const upload = multer({
     }
   },
 });
+
 // Helper function to convert buffer to base64
 const bufferToBase64 = (buffer, mimetype) => {
   return `data:${mimetype};base64,${buffer.toString("base64")}`;
 };
 
-router.post("/", upload.single("profilePicture"), async (req, res) => {
+// Get user's supplier data
+router.get("/my-supplier", authenticateUser, async (req, res) => {
   try {
-    const supplierData = {
-      ...req.body,
-      address: req.body.address ? JSON.parse(req.body.address) : undefined,
-      status: "Pending",
-    };
+    let supplier = null;
 
-    if (req.file) {
-      supplierData.profilePicture = bufferToBase64(
-        req.file.buffer,
-        req.file.mimetype
-      );
+    if (req.user.supplierId) {
+      supplier = await Supplier.findById(req.user.supplierId);
     }
 
-    let supplier = await Supplier.findOne({ email: supplierData.email });
-    if (supplier) {
-      supplier = await Supplier.findOneAndUpdate(
-        { email: supplierData.email },
-        supplierData,
-        { new: true }
-      );
-    } else {
-      supplier = new Supplier(supplierData);
-      await supplier.save();
-    }
-
-    res.status(201).json(supplier);
+    res.json({
+      success: true,
+      user: {
+        id: req.user._id,
+        phone: req.user.phone,
+        email: req.user.email,
+        companyName: req.user.companyName,
+        contactPerson: req.user.contactPerson,
+        profilePicture: req.user.profilePicture,
+        address: req.user.address,
+        website: req.user.website,
+        taxId: req.user.taxId,
+        businessType: req.user.businessType,
+        yearsInBusiness: req.user.yearsInBusiness,
+        profileCompleted: req.user.profileCompleted,
+      },
+      supplier: supplier,
+      hasSupplierData: !!supplier,
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    console.error("Error fetching supplier data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch supplier data",
+    });
   }
 });
 
-// Business Details Routes - Admin only
-router.patch(
-  "/:id/business",
-
+// Create or update supplier profile
+router.post(
+  "/",
+  authenticateUser,
+  upload.single("profilePicture"),
   async (req, res) => {
     try {
-      const { id } = req.params;
-      const businessData = req.body;
-
-      const validBusinessTypes = [
-        "Manufacturer",
-        "Wholesaler",
-        "Distributor",
-        "Importer",
-        "Other",
-      ];
-      const validPaymentTerms = [
-        "Net 30",
-        "Net 60",
-        "Advance Payment",
-        "Cash on Delivery",
-        "Other",
-      ];
-      const validShippingMethods = [
-        "Air Freight",
-        "Sea Freight",
-        "Land Transport",
-        "Express Delivery",
-        "Standard Delivery",
-      ];
-      const validDeliveryAreas = ["Seminyak", "Bali"];
-
-      // Validate business types
-      if (
-        businessData.businessType &&
-        Array.isArray(businessData.businessType)
-      ) {
-        const invalidTypes = businessData.businessType.filter(
-          (type) => !validBusinessTypes.includes(type)
-        );
-        if (invalidTypes.length > 0) {
-          return res.status(400).json({
-            message: `Invalid business types: ${invalidTypes.join(", ")}`,
-          });
-        }
-      }
-
-      // Validate payment terms
-      if (
-        businessData.paymentTerms &&
-        Array.isArray(businessData.paymentTerms)
-      ) {
-        const invalidTerms = businessData.paymentTerms.filter(
-          (term) => !validPaymentTerms.includes(term)
-        );
-        if (invalidTerms.length > 0) {
-          return res.status(400).json({
-            message: `Invalid payment terms: ${invalidTerms.join(", ")}`,
-          });
-        }
-      }
-
-      // Validate shipping methods
-      if (
-        businessData.shippingMethods &&
-        Array.isArray(businessData.shippingMethods)
-      ) {
-        const invalidMethods = businessData.shippingMethods.filter(
-          (method) => !validShippingMethods.includes(method)
-        );
-        if (invalidMethods.length > 0) {
-          return res.status(400).json({
-            message: `Invalid shipping methods: ${invalidMethods.join(", ")}`,
-          });
-        }
-      }
-
-      // Validate delivery areas
-      if (
-        businessData.deliveryAreas &&
-        Array.isArray(businessData.deliveryAreas)
-      ) {
-        const invalidAreas = businessData.deliveryAreas.filter(
-          (area) => !validDeliveryAreas.includes(area)
-        );
-        if (invalidAreas.length > 0) {
-          return res.status(400).json({
-            message: `Invalid delivery areas: ${invalidAreas.join(", ")}`,
-          });
-        }
-      }
-
-      // Parse arrays safely
-      const updateData = {
-        ...businessData,
-        businessType: Array.isArray(businessData.businessType)
-          ? businessData.businessType
-          : JSON.parse(businessData.businessType || "[]"),
-        products: Array.isArray(businessData.products)
-          ? businessData.products
-          : JSON.parse(businessData.products || "[]"),
-        warehouses: Array.isArray(businessData.warehouses)
-          ? businessData.warehouses
-          : JSON.parse(businessData.warehouses || "[]"),
-        shippingMethods: Array.isArray(businessData.shippingMethods)
-          ? businessData.shippingMethods
-          : JSON.parse(businessData.shippingMethods || "[]"),
-        deliveryAreas: Array.isArray(businessData.deliveryAreas)
-          ? businessData.deliveryAreas
-          : JSON.parse(businessData.deliveryAreas || "[]"),
-        paymentTerms: Array.isArray(businessData.paymentTerms)
-          ? businessData.paymentTerms
-          : JSON.parse(businessData.paymentTerms || "[]"),
-        documents: Array.isArray(businessData.documents)
-          ? businessData.documents
-          : JSON.parse(businessData.documents || "[]"),
-        preferredCurrency: "IDR",
+      const userId = req.user._id;
+      const supplierData = {
+        ...req.body,
+        address: req.body.address ? JSON.parse(req.body.address) : undefined,
+        status: "Pending",
       };
 
-      const updatedSupplier = await Supplier.findByIdAndUpdate(id, updateData, {
-        new: true,
-      });
+      // Update user data
+      const userData = {
+        email: supplierData.email,
+        companyName: supplierData.companyName,
+        contactPerson: supplierData.contactPerson,
+        website: supplierData.website,
+        taxId: supplierData.taxId,
+        address: supplierData.address,
+        profileCompleted: true,
+      };
 
-      if (!updatedSupplier) {
-        return res.status(404).json({ message: "Supplier not found" });
+      if (req.file) {
+        supplierData.profilePicture = bufferToBase64(
+          req.file.buffer,
+          req.file.mimetype
+        );
+        userData.profilePicture = supplierData.profilePicture;
       }
 
-      res.json(updatedSupplier);
+      // Update user record
+      await User.findByIdAndUpdate(userId, userData);
+
+      let supplier;
+
+      if (req.user.supplierId) {
+        // Update existing supplier
+        supplier = await Supplier.findByIdAndUpdate(
+          req.user.supplierId,
+          supplierData,
+          { new: true }
+        );
+      } else {
+        // Create new supplier
+        supplier = new Supplier(supplierData);
+        await supplier.save();
+
+        // Link supplier to user
+        await User.findByIdAndUpdate(userId, {
+          supplierId: supplier._id,
+          profileCompleted: true,
+        });
+      }
+
+      res.status(201).json({
+        success: true,
+        supplier: supplier,
+        message: "Supplier profile saved successfully",
+      });
     } catch (error) {
-      console.error("Error updating business details:", error);
+      console.error("Error saving supplier:", error);
       res.status(400).json({
+        success: false,
         message: error.message,
-        details:
-          process.env.NODE_ENV !== "production" ? error.stack : undefined,
       });
     }
   }
 );
 
-// Document upload route - Admin only
+// Update supplier business details
+router.patch("/:id/business", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const businessData = req.body;
+
+    // Verify ownership
+    if (req.user.supplierId?.toString() !== id) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You can only edit your own supplier data.",
+      });
+    }
+
+    const validBusinessTypes = [
+      "Manufacturer",
+      "Wholesaler",
+      "Distributor",
+      "Importer",
+      "Other",
+    ];
+    const validPaymentTerms = [
+      "Net 30",
+      "Net 60",
+      "Advance Payment",
+      "Cash on Delivery",
+      "Other",
+    ];
+    const validShippingMethods = [
+      "Air Freight",
+      "Sea Freight",
+      "Land Transport",
+      "Express Delivery",
+      "Standard Delivery",
+    ];
+    const validDeliveryAreas = ["Seminyak", "Bali"];
+
+    // Validate arrays
+    if (businessData.businessType && Array.isArray(businessData.businessType)) {
+      const invalidTypes = businessData.businessType.filter(
+        (type) => !validBusinessTypes.includes(type)
+      );
+      if (invalidTypes.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid business types: ${invalidTypes.join(", ")}`,
+        });
+      }
+    }
+
+    // Parse arrays safely
+    const updateData = {
+      ...businessData,
+      businessType: Array.isArray(businessData.businessType)
+        ? businessData.businessType
+        : JSON.parse(businessData.businessType || "[]"),
+      products: Array.isArray(businessData.products)
+        ? businessData.products
+        : JSON.parse(businessData.products || "[]"),
+      warehouses: Array.isArray(businessData.warehouses)
+        ? businessData.warehouses
+        : JSON.parse(businessData.warehouses || "[]"),
+      shippingMethods: Array.isArray(businessData.shippingMethods)
+        ? businessData.shippingMethods
+        : JSON.parse(businessData.shippingMethods || "[]"),
+      deliveryAreas: Array.isArray(businessData.deliveryAreas)
+        ? businessData.deliveryAreas
+        : JSON.parse(businessData.deliveryAreas || "[]"),
+      paymentTerms: Array.isArray(businessData.paymentTerms)
+        ? businessData.paymentTerms
+        : JSON.parse(businessData.paymentTerms || "[]"),
+      documents: Array.isArray(businessData.documents)
+        ? businessData.documents
+        : JSON.parse(businessData.documents || "[]"),
+      preferredCurrency: "IDR",
+    };
+
+    const updatedSupplier = await Supplier.findByIdAndUpdate(id, updateData, {
+      new: true,
+    });
+
+    if (!updatedSupplier) {
+      return res.status(404).json({
+        success: false,
+        message: "Supplier not found",
+      });
+    }
+
+    // Update user business info too
+    await User.findByIdAndUpdate(req.user._id, {
+      businessType: updateData.businessType,
+      yearsInBusiness: updateData.yearsInBusiness,
+    });
+
+    res.json({
+      success: true,
+      supplier: updatedSupplier,
+      message: "Business details updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating business details:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
+
+// Document upload route
 router.post(
   "/:id/documents",
-
+  authenticateUser,
   upload.single("documentImage"),
   async (req, res) => {
     try {
       const { id } = req.params;
       const { documentId, description } = req.body;
 
+      // Verify ownership
+      if (req.user.supplierId?.toString() !== id) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied",
+        });
+      }
+
       if (!req.file) {
-        return res.status(400).json({ message: "Document image is required" });
+        return res.status(400).json({
+          success: false,
+          message: "Document image is required",
+        });
       }
 
       const documentData = {
@@ -226,156 +284,150 @@ router.post(
 
       const supplier = await Supplier.findById(id);
       if (!supplier) {
-        return res.status(404).json({ message: "Supplier not found" });
+        return res.status(404).json({
+          success: false,
+          message: "Supplier not found",
+        });
       }
 
       supplier.documents.push(documentData);
       await supplier.save();
 
-      res.json(supplier);
+      res.json({
+        success: true,
+        supplier: supplier,
+        message: "Document uploaded successfully",
+      });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error("Error uploading document:", error);
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 );
 
-// Delete document route - Admin only
+// Delete document route
 router.delete(
   "/:id/documents/:documentIndex",
-
+  authenticateUser,
   async (req, res) => {
     try {
       const { id, documentIndex } = req.params;
 
+      // Verify ownership
+      if (req.user.supplierId?.toString() !== id) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied",
+        });
+      }
+
       const supplier = await Supplier.findById(id);
       if (!supplier) {
-        return res.status(404).json({ message: "Supplier not found" });
+        return res.status(404).json({
+          success: false,
+          message: "Supplier not found",
+        });
       }
 
       if (documentIndex >= supplier.documents.length) {
-        return res.status(404).json({ message: "Document not found" });
+        return res.status(404).json({
+          success: false,
+          message: "Document not found",
+        });
       }
 
       supplier.documents.splice(documentIndex, 1);
       await supplier.save();
 
-      res.json(supplier);
+      res.json({
+        success: true,
+        supplier: supplier,
+        message: "Document deleted successfully",
+      });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error("Error deleting document:", error);
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 );
 
-// Get all suppliers - Both viewer and admin can access
-router.get("/", authenticateJWT, async (req, res) => {
-  try {
-    const suppliers = await Supplier.find().sort({ createdAt: -1 });
-    res.json(suppliers);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Get single supplier - Both viewer and admin can access
-router.get("/:id", authenticateJWT, async (req, res) => {
-  try {
-    const supplier = await Supplier.findById(req.params.id);
-    if (!supplier) {
-      return res.status(404).json({ message: "Supplier not found" });
-    }
-    res.json(supplier);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Update supplier - Admin only
+// Update supplier profile (general info)
 router.patch(
-  "/:id",
-
+  "/profile",
+  authenticateUser,
   upload.single("profilePicture"),
   async (req, res) => {
     try {
-      const supplierData = req.body;
+      const userId = req.user._id;
+      const profileData = req.body;
+
+      // Update user data
+      const userData = {
+        email: profileData.email,
+        companyName: profileData.companyName,
+        contactPerson: profileData.contactPerson,
+        website: profileData.website,
+        taxId: profileData.taxId,
+        address: profileData.address
+          ? JSON.parse(profileData.address)
+          : req.user.address,
+      };
 
       if (req.file) {
-        supplierData.profilePicture = bufferToBase64(
+        userData.profilePicture = bufferToBase64(
           req.file.buffer,
           req.file.mimetype
         );
+        profileData.profilePicture = userData.profilePicture;
       }
 
-      if (typeof supplierData.products === "string") {
-        supplierData.products = JSON.parse(supplierData.products);
-      }
-      if (typeof supplierData.warehouses === "string") {
-        supplierData.warehouses = JSON.parse(supplierData.warehouses);
-      }
-      if (typeof supplierData.address === "string") {
-        supplierData.address = JSON.parse(supplierData.address);
-      }
-      if (typeof supplierData.documents === "string") {
-        supplierData.documents = JSON.parse(supplierData.documents);
+      // Update user
+      const updatedUser = await User.findByIdAndUpdate(userId, userData, {
+        new: true,
+      });
+
+      // Update supplier if exists
+      if (req.user.supplierId) {
+        await Supplier.findByIdAndUpdate(req.user.supplierId, {
+          companyName: profileData.companyName,
+          contactPerson: profileData.contactPerson,
+          email: profileData.email,
+          website: profileData.website,
+          taxId: profileData.taxId,
+          address: userData.address,
+          profilePicture: userData.profilePicture,
+        });
       }
 
-      const supplier = await Supplier.findByIdAndUpdate(
-        req.params.id,
-        supplierData,
-        { new: true }
-      );
-
-      if (!supplier) {
-        return res.status(404).json({ message: "Supplier not found" });
-      }
-
-      res.json(supplier);
+      res.json({
+        success: true,
+        user: {
+          id: updatedUser._id,
+          phone: updatedUser.phone,
+          email: updatedUser.email,
+          companyName: updatedUser.companyName,
+          contactPerson: updatedUser.contactPerson,
+          profilePicture: updatedUser.profilePicture,
+          address: updatedUser.address,
+          website: updatedUser.website,
+          taxId: updatedUser.taxId,
+        },
+        message: "Profile updated successfully",
+      });
     } catch (error) {
-      res.status(400).json({ message: error.message });
+      console.error("Error updating profile:", error);
+      res.status(400).json({
+        success: false,
+        message: error.message,
+      });
     }
   }
 );
-
-// Update supplier status - Both admin and user can access
-router.patch(
-  "/:id/status",
-  authenticateJWT,
-  checkRole(["admin", "user"]), // Changed to allow both roles
-  async (req, res) => {
-    try {
-      const { status } = req.body;
-
-      if (!["Pending", "Approved", "Rejected"].includes(status)) {
-        return res.status(400).json({ message: "Invalid status" });
-      }
-
-      const supplier = await Supplier.findByIdAndUpdate(
-        req.params.id,
-        { status },
-        { new: true }
-      );
-
-      if (!supplier) {
-        return res.status(404).json({ message: "Supplier not found" });
-      }
-
-      res.json(supplier);
-    } catch (error) {
-      res.status(400).json({ message: error.message });
-    }
-  }
-);
-
-// Delete supplier - Admin only
-router.delete("/:id", authenticateJWT, checkRole("admin"), async (req, res) => {
-  try {
-    const supplier = await Supplier.findByIdAndDelete(req.params.id);
-    if (!supplier) {
-      return res.status(404).json({ message: "Supplier not found" });
-    }
-    res.json({ message: "Supplier deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
 
 module.exports = router;

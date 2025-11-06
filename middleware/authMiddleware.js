@@ -1,38 +1,99 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/userModel");
+const User = require("../models/User");
 
-const JWT_SECRET = "your_jwt_secret_key_here";
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_here";
 
-exports.authenticateJWT = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
+exports.authenticateUser = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
 
-  if (!token) {
-    return res.status(401).json({ message: "No token provided" });
-  }
-
-  jwt.verify(token, JWT_SECRET, async (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ message: "Failed to authenticate token" });
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "No token provided",
+      });
     }
 
-    try {
-      const user = await User.findById(decoded.id);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    // Find user
+    const user = await User.findById(decoded.userId).populate("supplierId");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check if token was issued before user's last token update
+    if (decoded.iat && user.lastTokenIssued) {
+      const tokenIssuedAt = new Date(decoded.iat * 1000);
+      if (tokenIssuedAt < user.lastTokenIssued) {
+        return res.status(401).json({
+          success: false,
+          message: "Token revoked",
+        });
       }
-
-      req.user = user;
-      next();
-    } catch (error) {
-      return res.status(500).json({ message: "Error finding user" });
     }
-  });
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("Authentication error:", error);
+
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token",
+      });
+    } else if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Token expired",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Authentication failed",
+    });
+  }
 };
 
-// Modified to handle multiple roles
-exports.checkRole = (roles) => (req, res, next) => {
-  if (!roles.includes(req.user.role)) {
-    return res.status(403).json({ message: "Insufficient permissions" });
+// Optional middleware to get user if token exists (doesn't fail if no token)
+exports.optionalAuth = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      req.user = null;
+      return next();
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await User.findById(decoded.userId).populate("supplierId");
+
+    if (user) {
+      // Check token validity
+      if (decoded.iat && user.lastTokenIssued) {
+        const tokenIssuedAt = new Date(decoded.iat * 1000);
+        if (tokenIssuedAt >= user.lastTokenIssued) {
+          req.user = user;
+        } else {
+          req.user = null;
+        }
+      } else {
+        req.user = user;
+      }
+    } else {
+      req.user = null;
+    }
+
+    next();
+  } catch (error) {
+    req.user = null;
+    next();
   }
-  next();
 };
