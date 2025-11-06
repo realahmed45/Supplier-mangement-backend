@@ -33,6 +33,28 @@ const bufferToBase64 = (buffer, mimetype) => {
   return `data:${mimetype};base64,${buffer.toString("base64")}`;
 };
 
+// Debug endpoint to test authentication
+router.get("/debug/auth-test", authenticateUser, async (req, res) => {
+  try {
+    res.json({
+      success: true,
+      message: "Authentication working",
+      user: {
+        id: req.user._id,
+        phone: req.user.phone,
+        email: req.user.email,
+        hasSupplier: !!req.user.supplierId,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Debug test failed",
+      error: error.message,
+    });
+  }
+});
+
 // Get user's supplier data
 router.get("/my-supplier", authenticateUser, async (req, res) => {
   try {

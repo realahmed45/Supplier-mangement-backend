@@ -5,6 +5,12 @@ const User = require("../models/User");
 
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_here";
 
+// Log JWT secret for debugging (first 10 chars only)
+console.log(
+  "Auth routes JWT_SECRET (first 10 chars):",
+  JWT_SECRET.substring(0, 10) + "..."
+);
+
 module.exports = () => {
   const router = require("express").Router();
 
