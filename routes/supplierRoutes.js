@@ -99,6 +99,8 @@ router.post(
   upload.single("profilePicture"),
   async (req, res) => {
     try {
+      console.log("Creating supplier for user:", req.user._id);
+
       const userId = req.user._id;
       const supplierData = {
         ...req.body,
@@ -125,28 +127,32 @@ router.post(
         userData.profilePicture = supplierData.profilePicture;
       }
 
-      // Update user record
-      await User.findByIdAndUpdate(userId, userData);
-
       let supplier;
 
       if (req.user.supplierId) {
+        console.log("Updating existing supplier:", req.user.supplierId);
         // Update existing supplier
         supplier = await Supplier.findByIdAndUpdate(
           req.user.supplierId,
           supplierData,
           { new: true }
         );
+
+        // Update user record
+        await User.findByIdAndUpdate(userId, userData);
       } else {
+        console.log("Creating new supplier");
         // Create new supplier
         supplier = new Supplier(supplierData);
         await supplier.save();
 
-        // Link supplier to user
-        await User.findByIdAndUpdate(userId, {
-          supplierId: supplier._id,
-          profileCompleted: true,
-        });
+        console.log("New supplier created with ID:", supplier._id);
+
+        // Link supplier to user and update user data
+        userData.supplierId = supplier._id;
+        await User.findByIdAndUpdate(userId, userData);
+
+        console.log("User updated with supplier ID:", supplier._id);
       }
 
       res.status(201).json({
@@ -170,12 +176,32 @@ router.patch("/:id/business", authenticateUser, async (req, res) => {
     const { id } = req.params;
     const businessData = req.body;
 
-    // Verify ownership
-    if (req.user.supplierId?.toString() !== id) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. You can only edit your own supplier data.",
-      });
+    console.log("Business update request for supplier:", id);
+    console.log("Request user supplierId:", req.user.supplierId?.toString());
+    console.log("Target supplier ID:", id);
+
+    // ENHANCED OWNERSHIP VERIFICATION
+    // Check if user owns this supplier OR if this is a newly created supplier
+    const isOwner = req.user.supplierId?.toString() === id;
+
+    if (!isOwner) {
+      // Additional check: Is this supplier associated with this user's phone?
+      const supplier = await Supplier.findById(id);
+      const phoneMatch = supplier && supplier.phone === req.user.phone;
+
+      if (!phoneMatch) {
+        console.log("Access denied - not owner and phone doesn't match");
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. You can only edit your own supplier data.",
+        });
+      } else {
+        console.log("Access granted via phone match");
+        // Update user's supplierId if this supplier belongs to them
+        await User.findByIdAndUpdate(req.user._id, { supplierId: id });
+      }
+    } else {
+      console.log("Access granted - user is owner");
     }
 
     const validBusinessTypes = [
@@ -241,6 +267,7 @@ router.patch("/:id/business", authenticateUser, async (req, res) => {
       preferredCurrency: "IDR",
     };
 
+    console.log("Updating supplier with business data...");
     const updatedSupplier = await Supplier.findByIdAndUpdate(id, updateData, {
       new: true,
     });
@@ -256,7 +283,10 @@ router.patch("/:id/business", authenticateUser, async (req, res) => {
     await User.findByIdAndUpdate(req.user._id, {
       businessType: updateData.businessType,
       yearsInBusiness: updateData.yearsInBusiness,
+      supplierId: id, // Ensure user has the correct supplierId
     });
+
+    console.log("Business data updated successfully");
 
     res.json({
       success: true,
@@ -282,12 +312,18 @@ router.post(
       const { id } = req.params;
       const { documentId, description } = req.body;
 
-      // Verify ownership
-      if (req.user.supplierId?.toString() !== id) {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied",
-        });
+      // Enhanced ownership verification
+      const isOwner = req.user.supplierId?.toString() === id;
+      if (!isOwner) {
+        const supplier = await Supplier.findById(id);
+        const phoneMatch = supplier && supplier.phone === req.user.phone;
+
+        if (!phoneMatch) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied",
+          });
+        }
       }
 
       if (!req.file) {
@@ -338,12 +374,18 @@ router.delete(
     try {
       const { id, documentIndex } = req.params;
 
-      // Verify ownership
-      if (req.user.supplierId?.toString() !== id) {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied",
-        });
+      // Enhanced ownership verification
+      const isOwner = req.user.supplierId?.toString() === id;
+      if (!isOwner) {
+        const supplier = await Supplier.findById(id);
+        const phoneMatch = supplier && supplier.phone === req.user.phone;
+
+        if (!phoneMatch) {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied",
+          });
+        }
       }
 
       const supplier = await Supplier.findById(id);
