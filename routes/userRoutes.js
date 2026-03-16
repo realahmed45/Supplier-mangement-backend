@@ -3,7 +3,28 @@ const router = express.Router();
 const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { authenticateJWT, checkRole } = require("../middleware/authMiddleware");
+const authenticateJWT = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const token = authHeader.split(" ")[1];
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+      if (err) return res.status(403).json({ message: "Invalid or expired token" });
+      req.user = user;
+      next();
+    });
+  } else {
+    res.status(401).json({ message: "Auth token is missing" });
+  }
+};
+
+const checkRole = (roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Unauthorized access" });
+    }
+    next();
+  };
+};
 
 const JWT_SECRET = "your_jwt_secret_key_here"; // replace with env in prod
 

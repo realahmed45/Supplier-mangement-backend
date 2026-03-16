@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const supplierRoutes = require("./routes/supplierRoutes");
 const authRoutes = require("./routes/authRoutes");
+const userRoutes = require("./routes/userRoutes");
 const path = require("path");
 
 const app = express();
@@ -39,6 +40,7 @@ mongoose
 
 // Routes
 app.use("/api/auth", authRoutes());
+app.use("/api/auth", userRoutes); // Mounted user routes (contains /login)
 app.use("/api/suppliers", supplierRoutes);
 
 // Health check route
