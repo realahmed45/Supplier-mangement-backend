@@ -4,6 +4,22 @@ const Supplier = require("../models/supplierModel");
 const User = require("../models/User");
 const multer = require("multer");
 const { authenticateUser } = require("../middleware/authMiddleware");
+const jwt = require("jsonwebtoken");
+
+const authenticateAdmin = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const token = authHeader.split(" ")[1];
+    // The admin routes use a different JWT secret than regular supplier routes
+    jwt.verify(token, "your_jwt_secret_key_here", (err, user) => {
+      if (err) return res.status(401).json({ message: "Invalid or expired admin token" });
+      req.user = user;
+      next();
+    });
+  } else {
+    res.status(401).json({ message: "Auth token is missing" });
+  }
+};
 
 // Configure multer for memory storage (base64)
 const storage = multer.memoryStorage();
@@ -93,7 +109,7 @@ router.get("/my-supplier", authenticateUser, async (req, res) => {
 });
 
 // Get all suppliers (Admin Dashboard)
-router.get("/", authenticateUser, async (req, res) => {
+router.get("/", authenticateAdmin, async (req, res) => {
   try {
     const suppliers = await Supplier.find();
     // App.js expects an array directly from response.data
@@ -183,7 +199,7 @@ router.post(
 );
 
 // Update supplier status (Admin Dashboard)
-router.patch("/:id/status", authenticateUser, async (req, res) => {
+router.patch("/:id/status", authenticateAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
