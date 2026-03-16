@@ -41,6 +41,7 @@ mongoose
 // Routes
 app.use("/api/auth", authRoutes());
 app.use("/api/auth", userRoutes); // Mounted user routes (contains /login)
+app.use("/api/users", userRoutes); // Mounted user routes for /api/users fetching and updates
 app.use("/api/suppliers", supplierRoutes);
 
 // Health check route

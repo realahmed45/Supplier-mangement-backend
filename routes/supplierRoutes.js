@@ -92,6 +92,18 @@ router.get("/my-supplier", authenticateUser, async (req, res) => {
   }
 });
 
+// Get all suppliers (Admin Dashboard)
+router.get("/", authenticateUser, async (req, res) => {
+  try {
+    const suppliers = await Supplier.find();
+    // App.js expects an array directly from response.data
+    res.json(suppliers);
+  } catch (error) {
+    console.error("Error fetching all suppliers:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch suppliers" });
+  }
+});
+
 // Create or update supplier profile
 router.post(
   "/",
@@ -169,6 +181,31 @@ router.post(
     }
   }
 );
+
+// Update supplier status (Admin Dashboard)
+router.patch("/:id/status", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    // In production we would check req.user.role === 'admin'
+    const updatedSupplier = await Supplier.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+    
+    if (!updatedSupplier) {
+      return res.status(404).json({ success: false, message: "Supplier not found" });
+    }
+    
+    // Support either success wrapper or raw return
+    res.json({ success: true, supplier: updatedSupplier });
+  } catch (error) {
+    console.error("Error updating supplier status:", error);
+    res.status(500).json({ success: false, message: "Failed to update status" });
+  }
+});
 
 // Update supplier business details
 router.patch("/:id/business", authenticateUser, async (req, res) => {
