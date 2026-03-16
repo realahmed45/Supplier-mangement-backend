@@ -42,7 +42,7 @@ router.post("/register", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "15m" }
     );
     res.status(201).json({ token });
   } catch (error) {
@@ -65,7 +65,7 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "15m" }
     );
     res.json({ token });
   } catch (error) {
