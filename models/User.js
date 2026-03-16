@@ -10,7 +10,9 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     trim: true,
-    sparse: true, // Allows multiple null values but unique non-null values
+    unique: true,
+    sparse: true,
+    default: undefined,
   },
   isVerified: {
     type: Boolean,

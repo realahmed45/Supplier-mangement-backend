@@ -173,10 +173,12 @@ Do not share this code with anyone.`;
           ...(process.env.NODE_ENV !== "production" && { otp }),
         });
       } catch (error) {
-        console.error("OTP generation error:", error);
+        console.error("OTP generation CRITICAL error detected:", error);
+        console.error("Error stack trace:", error.stack);
         res.status(500).json({
           success: false,
           message: "Failed to generate OTP",
+          error: error.message
         });
       }
     }
