@@ -106,7 +106,6 @@ module.exports = () => {
   // Generate OTP
   router.post(
     "/generate-otp",
-    simpleRateLimit(5, 15 * 60 * 1000),
     async (req, res) => {
       try {
         const { phone } = req.body;
@@ -186,7 +185,6 @@ Do not share this code with anyone.`;
   // Verify OTP
   router.post(
     "/verify-otp",
-    simpleRateLimit(10, 15 * 60 * 1000),
     async (req, res) => {
       try {
         const { phone, otp } = req.body;
